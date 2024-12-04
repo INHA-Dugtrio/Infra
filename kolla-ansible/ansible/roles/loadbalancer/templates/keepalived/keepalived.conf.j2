@@ -14,6 +14,11 @@ vrrp_instance kolla_internal_vip_{{ keepalived_virtual_router_id }} {
     virtual_router_id {{ keepalived_virtual_router_id }}
     priority {{ groups['loadbalancer'].index(inventory_hostname) + 1 }}
     advert_int 1
+
+    # internal vip 주소 지정
+    virtual_ipaddress {
+        {{ kolla_internal_vip_address }}/{{ internal_vip_cidr }} dev {{ api_interface }}
+    }
 {% if keepalived_traffic_mode == 'unicast' %}
     unicast_src_ip {{ api_interface_address }}
 {% if groups['loadbalancer'] | length > 1 %}
@@ -29,8 +34,10 @@ vrrp_instance kolla_internal_vip_{{ keepalived_virtual_router_id }} {
 {% endif %}
     virtual_ipaddress {
         {{ kolla_internal_vip_address }} dev {{ api_interface }}
+
+# external vip 주소 지정
 {% if haproxy_enable_external_vip | bool %}
-        {{ kolla_external_vip_address }} dev {{ kolla_external_vip_interface }}
+        {{ kolla_external_vip_address }}/{{ external_vip_cidr }} dev {{ kolla_external_vip_interface }}
 {% endif %}
     }
 {% if haproxy_enable_external_vip | bool and api_interface != kolla_external_vip_interface %}
@@ -38,6 +45,14 @@ vrrp_instance kolla_internal_vip_{{ keepalived_virtual_router_id }} {
         {{ kolla_external_vip_interface }}
     }
 {% endif %}
+
+# external vip와 관련된 라우팅 설정
+{% if external_vip_gateway is defined %}
+    virtual_routes {
+        0.0.0.0/0 via {{ external_vip_gateway }} dev {{ kolla_external_vip_interface }}
+    }
+{% endif %}
+
     authentication {
         auth_type PASS
         auth_pass {{ keepalived_password }}
